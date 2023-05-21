@@ -18,13 +18,16 @@ connections()
 const App = express()
 
 // Middlewares
+App.use(cors())
 
 App.use(express.json())
-App.use(cors())
 App.use(morgan("dev"))
 
 // Rest Api
 App.use('/api/v1/auth', authRoutes)
+App.use('/api/v1/category', require('./routes/categoryRoute'))
+App.use('/api/v1/product', require('./routes/productRoute'))
+
 App.get("/", (req, res) => {
     res.send("haha haha");
 })

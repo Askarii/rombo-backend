@@ -6,7 +6,7 @@ dotenv.config({path: "../.env"})
 
 exports.registerController = async (req, res) => {
     try {
-        const {username, email,password, phone, address} = req.body;
+        const {username, email, password, phone, address, answer} = req.body;
         // Validations
         if(!username) {
             return res.send({error: "username is required"})
@@ -23,9 +23,12 @@ exports.registerController = async (req, res) => {
         if(!address) {
             return res.send({error: "Address is required"})
         }
+        if(!answer) {
+            return res.send({error: "Answer is required"})
+        }
 
         // Check for user
-        const userMatch = await User.findOne({email: email})
+        const userMatch = await User.findOne({email})
         // Check for existing User
         if(userMatch){
             res.status(200).send({
@@ -41,7 +44,8 @@ exports.registerController = async (req, res) => {
             email,
             phone,
             address,
-            password: hashedPassword
+            answer,
+            password: hashedPassword,
         })
         await user.save()
 
@@ -95,10 +99,12 @@ exports.loginController = async (req, res) => {
             success: true,
             message: "Login successfully",
             user: {
-                 name: user.name,
+                 _id:user._id,
+                 name: user.username,
                  email: user.email,
                  address: user.address,
-                 phone: user.phone
+                 phone: user.phone,
+                 role: user.role
             },
             token
         })
@@ -110,4 +116,43 @@ exports.loginController = async (req, res) => {
             error
         })
     }
+}
+
+exports.forgotPasswordController = async (req, res) => {
+    try {
+        const {email, answer, newPassword} = req.body;
+        if(!email){
+            res.status(400).send({message: "Email is required"})
+        }
+        if(!answer){
+            res.status(400).send({message: "Question is required"})
+        }
+        if(!newPassword){
+            res.status(400).send({message: "New Password is required"})
+        }
+
+        // Check 
+        const user = await User.findOne({email, answer})
+        // Validation
+        if(!user) {
+            return res.status(404).send({
+                success: false,
+                message: "Wrong Email or Password"
+            })
+        }
+
+        const hashed = await hashPassword(newPassword)
+        await User.findByIdAndUpdate(user._id, {password: hashed});
+        res.status(200).send({
+            success: true,
+            message: "Password Reset Successfully"
+        })
+    } catch (error) {
+        console.log(error);
+        res.status(500).send({
+            success: false,
+            message: "Something wents wrong",
+            error
+        })
+    }   
 }
