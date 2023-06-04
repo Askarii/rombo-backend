@@ -2,7 +2,7 @@ const express = require('express');
 const formidable = require('express-formidable');
 const router = express.Router()
 const { requireSignIn, isAdmin} = require('../middlewares/authMiddleware');
-const { deleteProductController, createProductController, UpdateProductController, getAllProductsController, getProductController, getProductPhotoController } = require('../controllers/productController');
+const { deleteProductController, createProductController, UpdateProductController, getAllProductsController, getProductController, getProductPhotoController, getFilterController, brainTreeTokenController, brainTreePaymentController } = require('../controllers/productController');
 
 // Product Routes
 
@@ -10,7 +10,7 @@ const { deleteProductController, createProductController, UpdateProductControlle
 router.post('/create-product', requireSignIn, isAdmin, formidable(), createProductController);
 
 // Route for deleting products
-router.post('/delete-product/:pid', requireSignIn, isAdmin, deleteProductController)
+router.delete('/delete-product/:pid', requireSignIn, isAdmin, deleteProductController)
 
 // Route for updating products
 router.put('/update-product/:id', requireSignIn, isAdmin, UpdateProductController)
@@ -23,5 +23,15 @@ router.get('/:slug', getProductController);
 
 // Route for getting photo of the product
 router.get('/product-photo/:pid', getProductPhotoController)
+
+// Route for the filter
+router.post('/product-filter', getFilterController)
+
+// Route for the Payments
+// Token
+router.get('/braintree/token', brainTreeTokenController)
+
+// Route for The payments
+router.post('/braintree/payment', requireSignIn, brainTreePaymentController)
 
 module.exports = router;

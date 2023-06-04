@@ -1,6 +1,22 @@
 const { default: slugify } = require("slugify");
 const Product = require("../models/productModel");
+const Order = require("../models/orderModel");
+require('dotenv').config({path:"../.env"});
+var braintree = require("braintree");
+
+
 const fs = require('fs');
+const { BraintreeGateway } = require("braintree");
+
+
+// Payment Gateway
+const paymentGateway = new braintree.BraintreeGateway({
+    environment: braintree.Environment.Sandbox,
+    merchantId: process.env.BRAINTREE_MERCHANT_ID,
+    privateKey: process.env.BRAINTREE_PRIVATE_KEY,
+    publicKey: process.env.BRAINTREE_PUBLIC_KEY,
+
+})
 
 
 exports.createProductController = async (req, res) => {
@@ -156,5 +172,78 @@ exports.getProductPhotoController = async (req, res) => {
             success: false,
             message: "Error while getting photo"
         })
+    }
+}
+
+exports.getFilterController = async (req, res) => {
+    try {
+        const { checked, price } = req.body
+        let args = {}
+        if(checked.length > 0) {
+            args.category = checked;
+        }
+        if(price.length) {
+            args.price = {$gte: price[0], $lte: price[1] }
+        }
+        const products = await Product.find(args)
+        res.status(200).send({
+            success: true,
+            products
+        })
+    } catch (error) {
+        console.log(error);
+        return res.status(400).send({
+            success:false,
+            message: "Error while filtering product"
+        })
+    }
+}
+
+
+// Payment Gateway API
+// -->TOken
+exports.brainTreeTokenController = async (req, res) => {
+    try {
+        paymentGateway.clientToken.generate({}, (err, response) => {
+            if(err) {
+                res.status(500).send(err)
+            }else {
+                res.send(response)
+            }
+        })         
+    } catch (error) {
+        console.log(error);
+    }
+}
+
+// Payment Gateway API
+// --> Payment
+exports.brainTreePaymentController = async (req, res) => {
+    try {
+        const {cart, nonce} = req.body;
+        let total = 0;
+        cart.map(item => total += item.price);
+        let newTransaction = paymentGateway.transaction.sale({
+            amount:total,
+            paymentMethodNonce: nonce,
+            options: {
+                submitForSettlement: true
+            }
+        },
+        function(error, result){
+            if(result) {
+                const order = new Order({
+                    products: cart,
+                    payment: result,
+                    buyer: req.user._id,
+                }).save()
+                res.json({ok: true})
+            }else {
+                res.status(500).send(error)
+            }
+        }
+        )
+    } catch (error) {
+        console.log(error);
     }
 }

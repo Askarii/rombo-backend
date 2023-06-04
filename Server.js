@@ -6,7 +6,7 @@ const connections = require('./config/database');
 const morgan = require('morgan');
 const authRoutes = require('./routes/authRoute.js')
 const cors = require('cors');
-
+const path = require("path")
 
 // Env configuration
 dotenv.config()
@@ -22,14 +22,16 @@ App.use(cors())
 
 App.use(express.json())
 App.use(morgan("dev"))
+App.use(express.static(path.join(__dirname, '../client/build')))
+
 
 // Rest Api
 App.use('/api/v1/auth', authRoutes)
 App.use('/api/v1/category', require('./routes/categoryRoute'))
 App.use('/api/v1/product', require('./routes/productRoute'))
 
-App.get("/", (req, res) => {
-    res.send("haha haha");
+App.use('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../client/build/index.html'))
 })
 
 // Listening Port
