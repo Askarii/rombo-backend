@@ -4,6 +4,8 @@ const Order = require("../models/orderModel");
 require('dotenv').config({path:"../.env"});
 var braintree = require("braintree");
 
+const Stripe = require('stripe');
+const stripe = Stripe(process.env.STRIPE_SECRET_KEY)
 
 const fs = require('fs');
 const { BraintreeGateway } = require("braintree");
@@ -15,13 +17,12 @@ const paymentGateway = new braintree.BraintreeGateway({
     merchantId: process.env.BRAINTREE_MERCHANT_ID,
     privateKey: process.env.BRAINTREE_PRIVATE_KEY,
     publicKey: process.env.BRAINTREE_PUBLIC_KEY,
-
 })
 
 
 exports.createProductController = async (req, res) => {
     try {
-        const {name, description, slug, price, category, quantity, shipping} = req.fields
+        const {name, description, slug, price, category, quantity, shipping} = req.fields;
         const {photo} = req.files
         // Validation
         switch(true){
@@ -37,28 +38,28 @@ exports.createProductController = async (req, res) => {
                 return res.status(404).send({error: "Quantity is required"})
             case !shipping: 
                 return res.status(404).send({error: "Shipping is required"})
-            case photo && photo.size > 100000: 
+            case photo && photo.size > 10000000: 
                 return res.status(404).send({error: "Photo is required and should be less than 1Mb"})
-                
-                
         }
-        const newProduct = new Product({...req.fields, slug: slugify(name)})
+        const newProduct = new Product({...req.fields, slug: slugify(name)});
+
         if(photo) {
             newProduct.photo.data = fs.readFileSync(photo.path)
             newProduct.photo.contentType = photo.type
         }
-        await newProduct.save()
+        await newProduct.save();
+        
         res.status(201).send({
             success: true,
             message: "Product created successfully",
             newProduct
-        })
+        });
     } catch (error) {
         console.log(error);
         res.status(500).send({
             message: "Error while creating product",
             success: false
-        })
+        });
     }
 }
 
@@ -80,27 +81,14 @@ exports.deleteProductController = async (req, res) => {
 
 exports.UpdateProductController = async (req, res) => {
     try {
+        console.log(req.fields);
+        console.log(req);
+        console.log(req.body);
+
         const {name, description, slug, price, category, quantity, shipping} = req.fields
         const {photo} = req.files
         // Validation
-        switch(true){
-            case !name: 
-                return res.status(404).send({error: "Name is required"})
-            case !description: 
-                return res.status(404).send({error: "Description is required"})
-            case !price: 
-                return res.status(404).send({error: "Price is required"})
-            case !category: 
-                return res.status(404).send({error: "Category is required"})
-            case !quantity: 
-                return res.status(404).send({error: "Quantity is required"})
-            case !shipping: 
-                return res.status(404).send({error: "Shipping is required"})
-            case photo && photo.size > 100000: 
-                return res.status(404).send({error: "Photo is required and should be less than 1Mb"})
-                
-                
-        }
+        
         const newProduct = await Product.findByIdAndUpdate(req.params.pid, 
             {...req.fields, slug: slugify(name)},
             {new: true}
@@ -246,4 +234,35 @@ exports.brainTreePaymentController = async (req, res) => {
     } catch (error) {
         console.log(error);
     }
+}
+
+// paymeny by stripe controller 
+exports.paymentController = async (req, res) => {
+
+  const line_items = req.body.cart.map(item => {
+    return {
+      price_data: {
+        currency: 'aud',
+        product_data: {
+          name: item.name,
+          description: item.description,
+          metadata: {
+            id: item._id
+          }
+        },
+        unit_amount: item.price * 10,
+      },
+      quantity: item.quantity,
+    }
+  })
+
+  const session = await stripe.checkout.sessions.create({
+    
+    line_items,
+    mode: 'payment',
+    success_url: `${process.env.CLIENT_URL}/checkout-success`,
+    cancel_url: `${process.env.CLIENT_URL}/cart`,
+  });
+
+  res.send({url: session.url});
 }
